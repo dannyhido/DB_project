@@ -1,18 +1,670 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Admin Page</title>
+<meta charset="UTF-8">
+<title>Admin Dashboard</title>
+
+<style>
+body {
+    font-family: Arial;
+    margin: 0;
+    display: flex;
+}
+
+/* Sidebar */
+#sidebar {
+    width: 220px;
+    background: #2c3e50;
+    color: white;
+    height: 100vh;
+    padding: 10px;
+}
+
+.menu-item {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #444;
+}
+
+.menu-item:hover {
+    background: #34495e;
+}
+
+/* Main content */
+#content {
+    flex: 1;
+    padding: 20px;
+}
+
+/* Table styling */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 10px;
+}
+
+th, td {
+    border: 1px solid #ccc;
+    padding: 8px;
+}
+
+th {
+    background: #eee;
+}
+
+.hidden {
+    display: none;
+}
+
+button {
+    margin: 2px;
+}
+</style>
 </head>
+
 <body>
 
-<h1>Admin Dashboard</h1>
+<!-- SIDEBAR -->
+<div id="sidebar">
+    <form action="{{ url_for('logout') }}" method="GET">
+        <button type="submit">Logout</button>
+    </form>
 
-<p>Welcome, admin!</p>
+    <h2>Admin</h2>
+    
+    <div class="menu-item" onclick="toggle('courses')">Courses</div>
+    <div class="menu-item" onclick="toggle('sections')">Sections</div>
+    <div class="menu-item" onclick="toggle('classrooms')">Classrooms</div>
+    <div class="menu-item" onclick="toggle('departments')">Departments</div>
+    <div class="menu-item" onclick="toggle('timeslots')">Time Slots</div>
+    <div class="menu-item" onclick="toggle('instructors')">Instructors</div>
+    <div class="menu-item" onclick="toggle('students')">Students</div>
 
-<!-- Logout Button -->
-<form action="{{ url_for('logout') }}" method="GET">
-    <button type="submit">Logout</button>
-</form>
+</div>
+<!-- CONTENT -->
+<div id="content">
+
+    <h1>Database Admin Dashboard</h1>
+
+    <!-- dynamic action buttons (Add Course, etc.) -->
+    <div id="actions"></div>
+
+    <!-- dynamic forms render here -->
+    <div id="forms"></div>
+
+    <!-- tables render here -->
+    <div id="tables"></div>
+
+    <div id="editFormContainer"></div>
+
+</div>
+
+<script>
+const entities = [
+    "departments",
+    "courses",
+    "students",
+    "instructors",
+    "sections",
+    "classrooms",
+    "timeslots"
+];
+
+const formSchemas = {
+    courses: [
+        { key: "title", label: "Course Name" },
+        { key: "credits", label: "Credits" },
+        { key: "department", label: "Department", type: "select" }
+    ],
+
+    students: [
+        { key: "first_name", label: "First Name" },
+        { key: "last_name", label: "Last Name" },
+        { key: "department", label: "Department", type: "select" },
+        { key: "advisor_id", label: "Advisor Id" },
+    ],
+
+    instructors: [
+        { key: "first_name", label: "First Name" },
+        { key: "last_name", label: "Last Name" },
+        { key: "department_id", label: "Department Id" },
+        { key: "salary", label: "Salary" }
+    ],
+
+    departments: [
+        { key: "name", label: "Department Name" },
+        { key: "building", label: "Building Id" },
+        { key: "budget", label: "Budget" },
+    ],
+
+    classrooms:[
+        { key: "building", label: "Building Id" },
+        { key: "room_number", label: "Room Number" },
+
+    ],
+
+    sections:[
+    { key: "classroom_id", label: "Room Id" },
+    { key: "course_id", label: "Course Id" },
+    { key: "semester", label: "Semester" },
+    { key: "time_slot_id", label: "Time Slot Id" },
+    { key: "year", label: "Year" },
+    ],
+
+    timeslots:[
+    { key: "day", label: "Day" },
+    { key: "end_hr", label: "End Hour" },
+    { key: "end_min", label: "End Minute" },
+    { key: "start_hr", label: "Start Hour" },
+    { key: "start_min", label: "Start Minute" },
+    
+    ]
+
+};
+
+// store loaded tables so we don’t refetch every click
+let cache = {};
+let departments = [];
+let activeTable = "";
+
+loadDepartments();
+
+
+// LOAD DATA
+async function loadTable(entity) {
+    if (cache[entity]) return cache[entity];
+
+    const res = await fetch(`/api/${entity}`);
+    const data = await res.json();
+    cache[entity] = data;
+    return data;
+}
+
+
+function renderActions(entity) {
+    let html = "";
+
+    if (entity === "courses") {
+        html += `
+            <button onclick="toggleForm('courseForm')">
+                + Add Course
+            </button>
+
+            <div id="courseForm" style="display:none; margin-top:10px;">
+                <h3>Add Course</h3>
+
+                <input id="course_name" placeholder="Course Name"><br>
+                <input id="course_credits" placeholder="Credits"><br>
+
+                <select id="course_dept"></select><br>
+
+                <button onclick="addCourse()">Submit</button>
+            </div>
+        `;
+    }
+
+    if (entity === "departments") {
+        html += `
+            <button onclick="toggleForm('departmentForm')">
+                + Add Department
+            </button>
+
+            <div id="departmentForm" style="display:none; margin-top:10px;">
+                <h3>Add Department</h3>
+
+                <input id="dept_name" placeholder="Department Name"><br>
+                <input id="dept_building" placeholder="Building"><br>
+                <input id="dept_budget" placeholder="Budget"><br>
+
+                <button onclick="addDepartment()">Submit</button>
+            </div>
+        `;
+    }
+
+    if (entity === "instructors") {
+        html += `
+            <button onclick="toggleForm('instructorForm')">
+                + Add Instructor
+            </button>
+
+            <div id="instructorForm" style="display:none; margin-top:10px;">
+                <h3>Add Instructor</h3>
+
+                <input id="inst_first" placeholder="First Name"><br>
+                <input id="inst_last" placeholder="Last Name"><br>
+                <input id="inst_salary" placeholder="Salary"><br>
+
+                <select id="inst_dept"></select><br>
+
+                <button onclick="addInstructor()">Submit</button>
+            </div>
+        `;
+    }
+
+
+    if (entity === "classrooms") {
+    html += `
+        <button onclick="toggleForm('classroomForm')">
+            + Add Classroom
+        </button>
+
+        <div id="classroomForm" style="display:none; margin-top:10px;">
+            <h3>Add Classroom</h3>
+
+            <input id="room_number" placeholder="Room Number"><br>
+            <input id="building" placeholder="Building ID"><br>
+
+            <button onclick="addClassroom()">Submit</button>
+        </div>
+    `;
+}
+
+if (entity === "timeslots") {
+    html += `
+        <button onclick="toggleForm('timeslotForm')">
+            + Add Time Slot
+        </button>
+
+        <div id="timeslotForm" style="display:none; margin-top:10px;">
+            <h3>Add Time Slot</h3>
+
+            <input id="ts_day" placeholder="Day (Mon, Tue, etc)"><br>
+            <input id="ts_start_hr" placeholder="Start Hour"><br>
+            <input id="ts_start_min" placeholder="Start Minute"><br>
+            <input id="ts_end_hr" placeholder="End Hour"><br>
+            <input id="ts_end_min" placeholder="End Minute"><br>
+
+            <button onclick="addTimeSlot()">Submit</button>
+        </div>
+    `;
+}
+
+if (entity === "students") {
+    html += `
+        <button onclick="toggleForm('studentForm')">
+            + Add Student
+        </button>
+
+        <div id="studentForm" style="display:none; margin-top:10px;">
+            <h3>Add Student</h3>
+
+            <input id="stu_first" placeholder="First Name"><br>
+            <input id="stu_last" placeholder="Last Name"><br>
+            <input id="stu_advisor" placeholder="Advisor ID"><br>
+            <input id="stu_dept" placeholder="Department ID"><br>
+
+            <button onclick="addStudent()">Submit</button>
+        </div>
+    `;
+}
+
+if (entity === "sections") {
+    html += `
+        <button onclick="toggleForm('sectionForm')">
+            + Add Section
+        </button>
+
+        <div id="sectionForm" style="display:none; margin-top:10px;">
+            <h3>Add Section</h3>
+
+            <input id="sec_course_id" placeholder="Course ID"><br>
+            <input id="sec_instructor_id" placeholder="Instructor ID"><br>
+            <input id="sec_room_id" placeholder="Classroom ID"><br>
+            <input id="sec_timeslot_id" placeholder="Timeslot ID"><br>
+
+            <!-- NEW FIELDS -->
+            <input id="sec_semester" placeholder="Semester (Fall/Spring)"><br>
+            <input id="sec_year" placeholder="Year"><br>
+
+            <button onclick="addSection()">Submit</button>
+        </div>
+    `;
+}
+
+    document.getElementById("actions").innerHTML = html;
+}
+
+function render(entity, data) {
+    if (!data.length) return `<p>No data</p>`;
+
+    let html = `<h2>${entity.toUpperCase()}</h2>`;
+    html += `<table><tr>`;
+
+    // headers
+    Object.keys(data[0]).forEach(k => {
+        html += `<th>${k}</th>`;
+    });
+
+    html += `<th>Actions</th></tr>`;
+
+    // rows
+    data.forEach(row => {
+        html += `<tr>`;
+
+        Object.values(row).forEach(v => {
+            html += `<td>${v}</td>`;
+        });
+
+        const id = row.department_id || row.course_id || row.student_id || row.instructor_id || row.classroom_id || row.time_slot_id
+
+        html += `
+            <td>
+                <button onclick='openEditForm("${entity}", ${JSON.stringify(row)})'>Edit</button>
+                <button onclick="deleteRecord('${entity}', ${id})">Delete</button>
+            </td>
+        `;
+
+        html += `</tr>`;
+    });
+
+    html += `</table>`;
+    return html;
+}
+
+async function addDepartment() {
+    const data = {
+        name: document.getElementById("dept_name").value,
+        building: document.getElementById("dept_building").value,
+        budget: document.getElementById("dept_budget").value
+    };
+
+    await fetch("/api/create_department", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+    location.reload();
+}
+
+async function addStudent() {
+    const data = {
+        first_name: document.getElementById("stu_first").value,
+        last_name: document.getElementById("stu_last").value,
+        advisor_id: document.getElementById("stu_advisor").value,
+        department: document.getElementById("stu_dept").value
+    };
+
+    await fetch("/api/create_student", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+    location.reload();
+}
+
+async function addTimeSlot() {
+    const data = {
+        day: document.getElementById("ts_day").value,
+        start_hr: document.getElementById("ts_start_hr").value,
+        start_min: document.getElementById("ts_start_min").value,
+        end_hr: document.getElementById("ts_end_hr").value,
+        end_min: document.getElementById("ts_end_min").value
+    };
+
+    await fetch("/api/create_timeslot", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+    location.reload();
+}
+
+async function addSection() {
+    const data = {
+        course_id: document.getElementById("sec_course_id").value,
+        instructor_id: document.getElementById("sec_instructor_id").value,
+        classroom_id: document.getElementById("sec_room_id").value,
+        timeslot_id: document.getElementById("sec_timeslot_id").value,
+
+        // NEW
+        semester: document.getElementById("sec_semester").value,
+        year: document.getElementById("sec_year").value
+    };
+
+    await fetch("/api/create_section", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+    location.reload();
+}
+
+async function addClassroom() {
+    const data = {
+        room_number: document.getElementById("room_number").value,
+        building: document.getElementById("building").value
+    };
+
+    await fetch("/api/create_classroom", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+    location.reload();
+}
+
+async function deleteRecord(entity, id) {
+    if (!confirm("Are you sure?")) return;
+
+    await fetch(`/api/delete_${entity.slice(0, -1)}/${id}`, {
+        method: "DELETE"
+    });
+
+    location.reload();
+}
+
+function openEditForm(entity, row) {
+
+    const idMap = {
+        departments: "department_id",
+        courses: "course_id",
+        students: "student_id",
+        instructors: "instructor_id",
+        sections: "section_id",
+        classrooms: "classroom_id",
+        timeslots: "time_slot_id"
+
+    };
+    const idField = idMap[entity];
+    const id = row[idField] || row.id;
+
+    const schema = formSchemas[entity];
+    if (!schema) return;
+
+    let html = `
+        <div style="border:1px solid #ccc; padding:10px; margin-top:10px;">
+            <h3>Edit ${entity.slice(0, -1)}</h3>
+            <input type="hidden" id="edit_id" value="${id}">
+    `;
+
+    schema.forEach(field => {
+        if (field.type === "select" && field.key === "department") {
+            html += `
+                <label>${field.label}</label><br>
+                <select id="edit_${field.key}"></select><br>
+            `;
+        } else {
+            html += `
+                <label>${field.label}</label><br>
+                <input id="edit_${field.key}"
+                       value="${row[field.key] || ''}"><br>
+            `;
+        }
+    });
+
+    html += `
+            <button onclick="submitEdit('${entity}')">Save</button>
+            <button onclick="closeEdit()">Cancel</button>
+        </div>
+    `;
+
+    document.getElementById("editFormContainer").innerHTML = html;
+
+    if (entity === "courses") {
+        setTimeout(() => {
+            const selectedId = row.department_id || row.department;
+            fillEditDepartmentDropdown(selectedId);
+        }, 0);
+    }
+}
+
+function fillInstructorDeptDropdown() {
+    const select = document.getElementById("inst_dept");
+    select.innerHTML = "";
+
+    departments.forEach(d => {
+        const option = document.createElement("option");
+        option.value = d.id || d.department_id;
+        option.text = d.name || d.dept_name;
+        select.appendChild(option);
+    });
+}
+
+function fillEditDepartmentDropdown(selectedId) {
+    const select = document.getElementById("edit_department");
+    select.innerHTML = "";
+
+    departments.forEach(d => {
+        const option = document.createElement("option");
+
+        const deptId = d.id || d.department_id;
+        option.value = deptId;
+        option.text = d.name || d.dept_name;
+
+        if (deptId == selectedId) {
+            option.selected = true;
+        }
+
+        select.appendChild(option);
+    });
+}
+async function submitEdit(entity) {
+    const id = document.getElementById("edit_id").value;
+
+    const schema = formSchemas[entity];
+
+    let payload = {};
+
+    schema.forEach(field => {
+        const el = document.getElementById(`edit_${field.key}`);
+        if (el) payload[field.key] = el.value;
+    });
+
+    await fetch(`/api/update_${entity.slice(0, -1)}/${id}`, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    });
+
+    closeEdit();
+    location.reload();
+}
+
+function closeEdit() {
+    document.getElementById("editFormContainer").innerHTML = "";
+}
+
+async function editRecord(entity, id) {
+
+    let newValue = prompt("Enter new name:");
+
+    if (!newValue) return;
+
+    await fetch(`/api/update_${entity.slice(0, -1)}/${id}`, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            name: newValue
+        })
+    });
+
+    location.reload();
+}
+
+async function toggle(entity) {
+    activeTable = entity;
+
+    const data = await loadTable(entity);
+    document.getElementById("tables").innerHTML = render(entity, data);
+
+    renderActions(entity);
+}
+
+
+
+async function addCourse() {
+    const data = {
+        name: document.getElementById("course_name").value,
+        credits: document.getElementById("course_credits").value,
+        department_id: document.getElementById("course_dept").value
+    };
+
+    await fetch("/api/create_course", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+   location.reload();
+}
+
+
+async function addInstructor() {
+    const data = {
+        first_name: document.getElementById("inst_first").value,
+        last_name: document.getElementById("inst_last").value,
+        salary: document.getElementById("inst_salary").value,
+        department_id: document.getElementById("inst_dept").value
+    };
+
+    await fetch("/api/create_instructor", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+    location.reload();
+}
+
+
+async function loadDepartments() {
+    const res = await fetch("/api/departments");
+    departments = await res.json();
+}
+
+function fillDepartmentDropdown() {
+    const select = document.getElementById("course_dept");
+    select.innerHTML = "";
+
+    departments.forEach(d => {
+        const option = document.createElement("option");
+        option.value = d.id;
+        option.text = d.name;
+        select.appendChild(option);
+    });
+}
+
+function toggleForm(id) {
+    const el = document.getElementById(id);
+    const show = el.style.display === "none";
+
+    el.style.display = show ? "block" : "none";
+
+    if (id === "courseForm" && show) {
+        fillDepartmentDropdown();
+    }
+
+    if (id === "instructorForm" && show) {
+        fillInstructorDeptDropdown();
+    }
+}
+
+</script>
 
 </body>
 </html>
