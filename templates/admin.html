@@ -1,103 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Admin Dashboard</title>
-
-<style>
-body {
-    font-family: Arial;
-    margin: 0;
-    display: flex;
-}
-
-/* Sidebar */
-#sidebar {
-    width: 220px;
-    background: #2c3e50;
-    color: white;
-    height: 100vh;
-    padding: 10px;
-}
-
-.menu-item {
-    padding: 10px;
-    cursor: pointer;
-    border-bottom: 1px solid #444;
-}
-
-.menu-item:hover {
-    background: #34495e;
-}
-
-/* Main content */
-#content {
-    flex: 1;
-    padding: 20px;
-}
-
-/* Table styling */
-table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-top: 10px;
-}
-
-th, td {
-    border: 1px solid #ccc;
-    padding: 8px;
-}
-
-th {
-    background: #eee;
-}
-
-.hidden {
-    display: none;
-}
-
-button {
-    margin: 2px;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body { display: flex; min-height: 100vh; background-color: #f8f9fa; }
+        .sidebar {
+            width: 250px;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px 0;
+            flex-shrink: 0;
+        }
+        .sidebar h2 { padding: 0 20px; font-size: 1.5rem; margin-bottom: 30px; }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar .nav-link:hover { background-color: #34495e; color: white; }
+        .sidebar .nav-link.active { background-color: #34495e; font-weight: bold; }
+        .content { flex-grow: 1; padding: 40px; }
+        .logout-btn { margin: 0 20px 20px 20px; }
+        
+        /* Table Styling to match student UI */
+        .table { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .table thead { background-color: #2c3e50; color: white; }
+        
+        /* Form Styling */
+        .card { border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input, select { margin-bottom: 10px; }
+    </style>
 </head>
 
 <body>
 
-<!-- SIDEBAR -->
-<div id="sidebar">
-    <form action="{{ url_for('logout') }}" method="GET">
-        <button type="submit">Logout</button>
-    </form>
+    <div class="sidebar">
+        <div class="logout-btn">
+            <form action="{{ url_for('logout') }}" method="GET">
+                <button type="submit" class="btn btn-sm btn-light w-100">Logout</button>
+            </form>
+        </div>
+        <h2>Admin</h2>
+        <div class="nav flex-column">
+            <a class="nav-link" onclick="toggle('courses')">Courses</a>
+            <a class="nav-link" onclick="toggle('sections')">Sections</a>
+            <a class="nav-link" onclick="toggle('classrooms')">Classrooms</a>
+            <a class="nav-link" onclick="toggle('departments')">Departments</a>
+            <a class="nav-link" onclick="toggle('timeslots')">Time Slots</a>
+            <a class="nav-link" onclick="toggle('instructors')">Instructors</a>
+            <a class="nav-link" onclick="toggle('students')">Students</a>
+        </div>
+    </div>
 
-    <h2>Admin</h2>
-    
-    <div class="menu-item" onclick="toggle('courses')">Courses</div>
-    <div class="menu-item" onclick="toggle('sections')">Sections</div>
-    <div class="menu-item" onclick="toggle('classrooms')">Classrooms</div>
-    <div class="menu-item" onclick="toggle('departments')">Departments</div>
-    <div class="menu-item" onclick="toggle('timeslots')">Time Slots</div>
-    <div class="menu-item" onclick="toggle('instructors')">Instructors</div>
-    <div class="menu-item" onclick="toggle('students')">Students</div>
+    <div class="content">
+        <h1 id="page-title">Database Admin Dashboard</h1>
+        <hr>
 
-</div>
-<!-- CONTENT -->
-<div id="content">
+        <div id="actions" class="mb-4"></div>
 
-    <h1>Database Admin Dashboard</h1>
+        <div id="forms"></div>
 
-    <!-- dynamic action buttons (Add Course, etc.) -->
-    <div id="actions"></div>
+        <div id="editFormContainer"></div>
 
-    <!-- dynamic forms render here -->
-    <div id="forms"></div>
-
-    <!-- tables render here -->
-    <div id="tables"></div>
-
-    <div id="editFormContainer"></div>
-
-</div>
+        <div id="tables" class="table-responsive"></div>
+    </div>
 
 <script>
 const entities = [
@@ -158,30 +128,29 @@ const formSchemas = {
     { key: "start_hr", label: "Start Hour" },
     { key: "start_min", label: "Start Minute" },
     
-    ]
+    ],
+    teaches: [
+    { key: "section_id", label: "Section ID" },
+    { key: "instructor_id", label: "Instructor" }
+]
 
 };
 
-// store loaded tables so we don’t refetch every click
 let cache = {};
 let departments = [];
 let activeTable = "";
 let buildings = [];
 
-
-
 async function initData() {
     await loadDepartments(); 
     await loadBuildings();
+    await loadInstructors();
 }
 
 initData();
 
-
-// LOAD DATA
 async function loadTable(entity) {
     if (cache[entity]) return cache[entity];
-
     const res = await fetch(`/api/${entity}`);
     const data = await res.json();
     cache[entity] = data;
@@ -193,65 +162,45 @@ async function loadBuildings() {
     buildings = await res.json();
 }
 
-
-
-
 function renderActions(entity) {
     let html = "";
 
     if (entity === "courses") {
         html += `
-            <button onclick="toggleForm('courseForm')">
-                + Add Course
-            </button>
-
-            <div id="courseForm" style="display:none; margin-top:10px;">
+            <button class="btn btn-primary" onclick="toggleForm('courseForm')">+ Add Course</button>
+            <div id="courseForm" class="card p-3 mt-3" style="display:none; max-width: 500px;">
                 <h3>Add Course</h3>
-
-                <input id="course_name" placeholder="Course Name"><br>
-                <input id="course_credits" placeholder="Credits"><br>
-
-                <select id="course_dept"></select><br>
-
-                <button onclick="addCourse()">Submit</button>
+                <input class="form-control" id="course_name" placeholder="Course Name">
+                <input class="form-control" id="course_credits" placeholder="Credits">
+                <select class="form-select" id="course_dept"></select>
+                <button class="btn btn-success mt-2" onclick="addCourse()">Submit</button>
             </div>
         `;
     }
 
     if (entity === "departments") {
         html += `
-            <button onclick="toggleForm('departmentForm')">
-                + Add Department
-            </button>
-
-            <div id="departmentForm" style="display:none; margin-top:10px;">
+            <button class="btn btn-primary" onclick="toggleForm('departmentForm')">+ Add Department</button>
+            <div id="departmentForm" class="card p-3 mt-3" style="display:none; max-width: 500px;">
                 <h3>Add Department</h3>
-
-                <input id="dept_name" placeholder="Department Name"><br>
-                <input id="dept_building" placeholder="Building"><br>
-                <input id="dept_budget" placeholder="Budget"><br>
-
-                <button onclick="addDepartment()">Submit</button>
+                <input class="form-control" id="dept_name" placeholder="Department Name">
+                <input class="form-control" id="dept_building" placeholder="Building">
+                <input class="form-control" id="dept_budget" placeholder="Budget">
+                <button class="btn btn-success mt-2" onclick="addDepartment()">Submit</button>
             </div>
         `;
     }
 
     if (entity === "instructors") {
         html += `
-            <button onclick="toggleForm('instructorForm')">
-                + Add Instructor
-            </button>
-
-            <div id="instructorForm" style="display:none; margin-top:10px;">
+            <button class="btn btn-primary" onclick="toggleForm('instructorForm')">+ Add Instructor</button>
+            <div id="instructorForm" class="card p-3 mt-3" style="display:none; max-width: 500px;">
                 <h3>Add Instructor</h3>
-
-                <input id="inst_first" placeholder="First Name"><br>
-                <input id="inst_last" placeholder="Last Name"><br>
-                <input id="inst_salary" placeholder="Salary"><br>
-
-                <select id="inst_dept"></select><br>
-
-                <button onclick="addInstructor()">Submit</button>
+                <input class="form-control" id="inst_first" placeholder="First Name">
+                <input class="form-control" id="inst_last" placeholder="Last Name">
+                <input class="form-control" id="inst_salary" placeholder="Salary">
+                <select class="form-select" id="inst_dept"></select>
+                <button class="btn btn-success mt-2" onclick="addInstructor()">Submit</button>
             </div>
         `;
     }
@@ -259,80 +208,68 @@ function renderActions(entity) {
 
     if (entity === "classrooms") {
     html += `
-        <button onclick="toggleForm('classroomForm')">
-            + Add Classroom
-        </button>
-
-        <div id="classroomForm" style="display:none; margin-top:10px;">
+        <button class="btn btn-primary" onclick="toggleForm('classroomForm')">+ Add Classroom</button>
+        <div id="classroomForm" class="card p-3 mt-3" style="display:none; max-width: 500px;">
             <h3>Add Classroom</h3>
-
-            <input id="room_number" placeholder="Room Number"><br>
-            <input id="building" placeholder="Building ID"><br>
-
-            <button onclick="addClassroom()">Submit</button>
+            <input class="form-control" id="room_number" placeholder="Room Number">
+            <input class="form-control" id="building" placeholder="Building ID">
+            <button class="btn btn-success mt-2" onclick="addClassroom()">Submit</button>
         </div>
     `;
 }
 
 if (entity === "timeslots") {
     html += `
-        <button onclick="toggleForm('timeslotForm')">
-            + Add Time Slot
-        </button>
-
-        <div id="timeslotForm" style="display:none; margin-top:10px;">
+        <button class="btn btn-primary" onclick="toggleForm('timeslotForm')">+ Add Time Slot</button>
+        <div id="timeslotForm" class="card p-3 mt-3" style="display:none; max-width: 500px;">
             <h3>Add Time Slot</h3>
-
-            <input id="ts_day" placeholder="Day (Mon, Tue, etc)"><br>
-            <input id="ts_start_hr" placeholder="Start Hour"><br>
-            <input id="ts_start_min" placeholder="Start Minute"><br>
-            <input id="ts_end_hr" placeholder="End Hour"><br>
-            <input id="ts_end_min" placeholder="End Minute"><br>
-
-            <button onclick="addTimeSlot()">Submit</button>
+            <input class="form-control" id="ts_day" placeholder="Day (Mon, Tue, etc)">
+            <input class="form-control" id="ts_start_hr" placeholder="Start Hour">
+            <input class="form-control" id="ts_start_min" placeholder="Start Minute">
+            <input class="form-control" id="ts_end_hr" placeholder="End Hour">
+            <input class="form-control" id="ts_end_min" placeholder="End Minute">
+            <button class="btn btn-success mt-2" onclick="addTimeSlot()">Submit</button>
         </div>
     `;
 }
 
 if (entity === "students") {
     html += `
-        <button onclick="toggleForm('studentForm')">
-            + Add Student
-        </button>
-
-        <div id="studentForm" style="display:none; margin-top:10px;">
+        <button class="btn btn-primary" onclick="toggleForm('studentForm')">+ Add Student</button>
+        <div id="studentForm" class="card p-3 mt-3" style="display:none; max-width: 500px;">
             <h3>Add Student</h3>
-
-            <input id="stu_first" placeholder="First Name"><br>
-            <input id="stu_last" placeholder="Last Name"><br>
-            <input id="stu_advisor" placeholder="Advisor ID"><br>
-            
-            <label>Department:</label><br>
-            <select id="stu_dept"></select><br>
-
-            <button onclick="addStudent()">Submit</button>
+            <input class="form-control" id="stu_first" placeholder="First Name">
+            <input class="form-control" id="stu_last" placeholder="Last Name">
+            <input class="form-control" id="stu_advisor" placeholder="Advisor ID">
+            <label class="form-label">Department:</label>
+            <select class="form-select" id="stu_dept"></select>
+            <button class="btn btn-success mt-2" onclick="addStudent()">Submit</button>
         </div>
     `;
 }
-
 if (entity === "sections") {
     html += `
-        <button onclick="toggleForm('sectionForm')">
-            + Add Section
-        </button>
-
-        <div id="sectionForm" style="display:none; margin-top:10px;">
+        <button class="btn btn-primary" onclick="toggleForm('sectionForm')">+ Add Section</button>
+        <button class="btn btn-secondary ms-2" onclick="toggleForm('assignInstructorForm')">+ Assign Instructor</button>
+        <div id="sectionForm" class="card p-3 mt-3" style="display:none; max-width: 500px;">
             <h3>Add Section</h3>
-
-            <input id="sec_course_id" placeholder="Course ID"><br>
-            <input id="sec_room_id" placeholder="Classroom ID"><br>
-            <input id="sec_time_slot_id" placeholder="Timeslot ID"><br>
-
-            <!-- NEW FIELDS -->
-            <input id="sec_semester" placeholder="Semester (Fall/Spring)"><br>
-            <input id="sec_year" placeholder="Year"><br>
-
-            <button onclick="addSection()">Submit</button>
+            <input class="form-control" id="sec_course_id" placeholder="Course ID">
+            <input class="form-control" id="sec_room_id" placeholder="Classroom ID">
+            <input class="form-control" id="sec_time_slot_id" placeholder="Timeslot ID">
+            <input class="form-control" id="sec_semester" placeholder="Semester (Fall/Spring)">
+            <input class="form-control" id="sec_year" placeholder="Year">
+            <button class="btn btn-success mt-2" onclick="addSection()">Submit</button>
+        </div>
+        <div id="assignInstructorForm" class="card p-3 mt-3" style="display:none; max-width: 500px;">
+            <h3>Assign Instructor to Section</h3>
+            <input class="form-control" id="assign_sec_id" placeholder="Section ID">
+            <label class="form-label mt-2">Instructor:</label>
+            <select class="form-select" id="assign_instructor_id"></select>
+            <button class="btn btn-success mt-2" onclick="assignInstructor()">Assign</button>
+            <hr>
+            <h5>Remove Instructor from Section</h5>
+            <input class="form-control" id="remove_sec_id" placeholder="Section ID">
+            <button class="btn btn-danger mt-2" onclick="removeInstructor()">Remove</button>
         </div>
     `;
 }
@@ -340,60 +277,84 @@ if (entity === "sections") {
     document.getElementById("actions").innerHTML = html;
 }
 
-function render(entity, data) {
-    if (!data.length) return `<p>No data</p>`;
+let instructors = [];
 
-    let html = `<h2>${entity.toUpperCase()}</h2>`;
-    html += `<table><tr>`;
+async function loadInstructors() {
+    const res = await fetch("/api/instructors");
+    instructors = await res.json();
+}
+
+function fillInstructorDropdown() {
+    const select = document.getElementById("assign_instructor_id");
+    if (!select) return;
+    select.innerHTML = "";
+    instructors.forEach(i => {
+        const option = document.createElement("option");
+        option.value = i.instructor_id || i.id;
+        option.text = `${i.first_name} ${i.last_name}`;
+        select.appendChild(option);
+    });
+}
+
+async function assignInstructor() {
+    const section_id = document.getElementById("assign_sec_id").value;
+    const instructor_id = document.getElementById("assign_instructor_id").value;
+    await fetch("/api/assign_instructor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section_id, instructor_id })
+    });
+    alert("Instructor assigned!");
+}
+
+async function removeInstructor() {
+    const section_id = document.getElementById("remove_sec_id").value;
+    if (!confirm("Remove instructor from this section?")) return;
+    await fetch(`/api/remove_instructor/${section_id}`, {
+        method: "DELETE"
+    });
+    alert("Instructor removed!");
+}
+
+function render(entity, data) {
+    if (!data.length) return `<p class="text-muted">No data available</p>`;
+
+    let html = `<h2 class="mb-3">${entity.charAt(0).toUpperCase() + entity.slice(1)}</h2>`;
+    html += `<table class="table table-hover"><thead><tr>`;
 
     Object.keys(data[0]).forEach(k => {
-        html += `<th>${k}</th>`;
+        html += `<th>${k.replace('_', ' ').toUpperCase()}</th>`;
     });
-    html += `<th>Actions</th></tr>`;
+    html += `<th>ACTIONS</th></tr></thead><tbody>`;
 
     data.forEach(row => {
         html += `<tr>`;
-
         Object.entries(row).forEach(([key, v]) => {
-    let displayValue = v;
+            let displayValue = v;
+            if ((key === "department_id" || key === "department") && entity !== "departments") {
+                const dept = departments.find(d => (d.id || d.department_id) == v);
+                if (dept) displayValue = dept.name || dept.dept_name;
+            }
+            if ((key === "building" || key === "building_id") && entity !== "buildings") {
+                const bld = buildings.find(b => (b.id || b.building_id) == v);
+                if (bld) displayValue = bld.name || bld.building_name;
+            }
+            html += `<td>${displayValue}</td>`;
+        });
 
-    if ((key === "department_id" || key === "department") && entity !== "departments") {
-        const dept = departments.find(d => (d.id || d.department_id) == v);
-        if (dept) {
-            displayValue = dept.name || dept.dept_name;
-        }
-    }
-
-    if ((key === "building" || key === "building_id") && entity !== "buildings") {
-        const bld = buildings.find(b => (b.id || b.building_id) == v);
-        if (bld) {
-            displayValue = bld.name || bld.building_name;
-        }
-    }
-
-    html += `<td>${displayValue}</td>`;
-});
-
-        const id = row.department_id || 
-                   row.course_id || 
-                   row.student_id || 
-                   row.instructor_id || 
-                   row.classroom_id || 
-                   row.time_slot_id || 
-                   row.section_id || 
-                   row.id;
+        const id = row.department_id || row.course_id || row.student_id || row.instructor_id || 
+                   row.classroom_id || row.time_slot_id || row.section_id || row.id;
 
         html += `
             <td>
-                <button onclick='openEditForm("${entity}", ${JSON.stringify(row)})'>Edit</button>
-                <button onclick="deleteRecord('${entity}', ${id})">Delete</button>
+                <button class="btn btn-sm btn-outline-primary" onclick='openEditForm("${entity}", ${JSON.stringify(row)})'>Edit</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord('${entity}', ${id})">Delete</button>
             </td>
         `;
-
         html += `</tr>`;
     });
 
-    html += `</table>`;
+    html += `</tbody></table>`;
     return html;
 }
 
@@ -403,13 +364,11 @@ async function addDepartment() {
         building: document.getElementById("dept_building").value,
         budget: document.getElementById("dept_budget").value
     };
-
     await fetch("/api/create_department", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(data)
     });
-
     location.reload();
 }
 
@@ -420,13 +379,11 @@ async function addStudent() {
         advisor_id: document.getElementById("stu_advisor").value,
         department: document.getElementById("stu_dept").value
     };
-
     await fetch("/api/create_student", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(data)
     });
-
     location.reload();
 }
 
@@ -438,13 +395,11 @@ async function addTimeSlot() {
         end_hr: document.getElementById("ts_end_hr").value,
         end_min: document.getElementById("ts_end_min").value
     };
-
     await fetch("/api/create_timeslot", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(data)
     });
-
     location.reload();
 }
 
@@ -453,18 +408,14 @@ async function addSection() {
         course_id: document.getElementById("sec_course_id").value,
         classroom_id: document.getElementById("sec_room_id").value,
         time_slot_id: document.getElementById("sec_time_slot_id").value,
-
-        // NEW
         semester: document.getElementById("sec_semester").value,
         year: document.getElementById("sec_year").value
     };
-
     await fetch("/api/create_section", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(data)
     });
-
     location.reload();
 }
 
@@ -473,28 +424,23 @@ async function addClassroom() {
         room_number: document.getElementById("room_number").value,
         building: document.getElementById("building").value
     };
-
     await fetch("/api/create_classroom", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(data)
     });
-
     location.reload();
 }
 
 async function deleteRecord(entity, id) {
     if (!confirm("Are you sure?")) return;
-
     await fetch(`/api/delete_${entity.slice(0, -1)}/${id}`, {
         method: "DELETE"
     });
-
     location.reload();
 }
 
 function openEditForm(entity, row) {
-
     const idMap = {
         departments: "department_id",
         courses: "course_id",
@@ -503,50 +449,47 @@ function openEditForm(entity, row) {
         sections: "section_id",
         classrooms: "classroom_id",
         timeslots: "time_slot_id"
-
     };
     const idField = idMap[entity];
     const id = row[idField] || row.id;
-
     const schema = formSchemas[entity];
     if (!schema) return;
 
     let html = `
-        <div style="border:1px solid #ccc; padding:10px; margin-top:10px;">
+        <div class="card p-4 mt-3" style="max-width: 500px; border-left: 5px solid #0d6efd;">
             <h3>Edit ${entity.slice(0, -1)}</h3>
             <input type="hidden" id="edit_id" value="${id}">
     `;
 
     schema.forEach(field => {
-        if (field.type === "select" && field.key === "department" || field.key === "department_id") {
+        if (field.type === "select" && (field.key === "department" || field.key === "department_id")) {
             html += `
-                <label>${field.label}</label><br>
-                <select id="edit_${field.key}"></select><br>
+                <label class="form-label">${field.label}</label>
+                <select class="form-select mb-2" id="edit_${field.key}"></select>
             `;
         } else {
             html += `
-                <label>${field.label}</label><br>
-                <input id="edit_${field.key}"
-                       value="${row[field.key] || ''}"><br>
+                <label class="form-label">${field.label}</label>
+                <input class="form-control mb-2" id="edit_${field.key}" value="${row[field.key] || ''}">
             `;
         }
     });
 
     html += `
-            <button onclick="submitEdit('${entity}')">Save</button>
-            <button onclick="closeEdit()">Cancel</button>
+            <div class="mt-3">
+                <button class="btn btn-primary" onclick="submitEdit('${entity}')">Save Changes</button>
+                <button class="btn btn-outline-secondary" onclick="closeEdit()">Cancel</button>
+            </div>
         </div>
     `;
 
     document.getElementById("editFormContainer").innerHTML = html;
     
     const dropdownEntities = ["courses", "students", "instructors"]
-if (dropdownEntities.includes(entity)) {
+    if (dropdownEntities.includes(entity)) {
         setTimeout(() => {
-            // Find which key in the schema is the department one
             const deptField = schema.find(f => f.key === "department" || f.key === "department_id");
             if (deptField) {
-                // Get the current value (handle both naming conventions)
                 const selectedId = row.department_id || row.department;
                 fillEditDepartmentDropdown(deptField.key, selectedId);
             }
@@ -557,7 +500,6 @@ if (dropdownEntities.includes(entity)) {
 function fillInstructorDeptDropdown() {
     const select = document.getElementById("inst_dept");
     select.innerHTML = "";
-
     departments.forEach(d => {
         const option = document.createElement("option");
         option.value = d.id || d.department_id;
@@ -569,10 +511,8 @@ function fillInstructorDeptDropdown() {
 function fillStudentDeptDropdown() {
     const select = document.getElementById("stu_dept");
     select.innerHTML = "";
-
     departments.forEach(d => {
         const option = document.createElement("option");
-        // Using the same logic as your other dropdowns
         option.value = d.id || d.department_id;
         option.text = d.name || d.dept_name;
         select.appendChild(option);
@@ -582,42 +522,30 @@ function fillStudentDeptDropdown() {
 function fillEditDepartmentDropdown(fieldKey, selectedId) {
     const select = document.getElementById(`edit_${fieldKey}`);
     if (!select) return;
-    
     select.innerHTML = "";
-
     departments.forEach(d => {
         const option = document.createElement("option");
-
-        // Handle cases where API returns .id or .department_id
         const deptId = d.department_id || d.id;
         option.value = deptId;
         option.text = d.dept_name || d.name;
-
-        if (deptId == selectedId) {
-            option.selected = true;
-        }
-
+        if (deptId == selectedId) option.selected = true;
         select.appendChild(option);
     });
 }
+
 async function submitEdit(entity) {
     const id = document.getElementById("edit_id").value;
-
     const schema = formSchemas[entity];
-
     let payload = {};
-
     schema.forEach(field => {
         const el = document.getElementById(`edit_${field.key}`);
         if (el) payload[field.key] = el.value;
     });
-
     await fetch(`/api/update_${entity.slice(0, -1)}/${id}`, {
         method: "PUT",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(payload)
     });
-
     closeEdit();
     location.reload();
 }
@@ -626,33 +554,17 @@ function closeEdit() {
     document.getElementById("editFormContainer").innerHTML = "";
 }
 
-async function editRecord(entity, id) {
-
-    let newValue = prompt("Enter new name:");
-
-    if (!newValue) return;
-
-    await fetch(`/api/update_${entity.slice(0, -1)}/${id}`, {
-        method: "PUT",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            name: newValue
-        })
-    });
-
-    location.reload();
-}
-
 async function toggle(entity) {
     activeTable = entity;
+    
+    // UI Active state
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    event.target.classList.add('active');
 
     const data = await loadTable(entity);
     document.getElementById("tables").innerHTML = render(entity, data);
-
     renderActions(entity);
 }
-
-
 
 async function addCourse() {
     const data = {
@@ -660,16 +572,13 @@ async function addCourse() {
         credits: document.getElementById("course_credits").value,
         department_id: document.getElementById("course_dept").value
     };
-
     await fetch("/api/create_course", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(data)
     });
-
-   location.reload();
+    location.reload();
 }
-
 
 async function addInstructor() {
     const data = {
@@ -678,16 +587,13 @@ async function addInstructor() {
         salary: document.getElementById("inst_salary").value,
         department_id: document.getElementById("inst_dept").value
     };
-
     await fetch("/api/create_instructor", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(data)
     });
-
     location.reload();
 }
-
 
 async function loadDepartments() {
     const res = await fetch("/api/departments");
@@ -697,7 +603,6 @@ async function loadDepartments() {
 function fillDepartmentDropdown() {
     const select = document.getElementById("course_dept");
     select.innerHTML = "";
-
     departments.forEach(d => {
         const option = document.createElement("option");
         option.value = d.id;
@@ -709,24 +614,12 @@ function fillDepartmentDropdown() {
 function toggleForm(id) {
     const el = document.getElementById(id);
     const show = el.style.display === "none";
-
     el.style.display = show ? "block" : "none";
-
-    if (id === "courseForm" && show) {
-        fillDepartmentDropdown(); // This uses "course_dept"
-    }
-
-    if (id === "instructorForm" && show) {
-        fillInstructorDeptDropdown(); // This uses "inst_dept"
-    }
-
-    // Add this block for students
-    if (id === "studentForm" && show) {
-        fillStudentDeptDropdown();
-    }
+    if (id === "courseForm" && show) fillDepartmentDropdown();
+    if (id === "instructorForm" && show) fillInstructorDeptDropdown();
+    if (id === "studentForm" && show) fillStudentDeptDropdown();
+    if (id === "assignInstructorForm" && show) fillInstructorDropdown();  // add this
 }
-
 </script>
-
 </body>
 </html>
