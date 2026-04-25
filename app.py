@@ -94,7 +94,7 @@ def register():
         role = request.form['role']
 
         cursor.callproc('RegisterUser', (username, password, role))
-        db.commit()
+        conn.commit()
 
         return redirect(url_for('home'))
 
@@ -129,6 +129,10 @@ def admin():
 @app.route("/api/courses")
 def get_courses():
     return jsonify(call_proc("GetAllCourses", fetch=True))
+
+@app.route("/api/building")
+def get_buildings():
+    return jsonify(call_proc("GetBuildings", fetch=True))
 
 @app.route("/api/students")
 def get_students():
@@ -214,21 +218,20 @@ def create_student():
     ])
 
     return jsonify({"success": True})
+
 @app.route("/api/create_section", methods=["POST"])
 def create_section():
     data = request.json
 
     call_proc("CreateSection", [
         data["course_id"],
-        data["instructor_id"],
-        data["classroom_id"],
-        data["timeslot_id"],
         data["semester"],
-        data["year"]
+        data["year"],
+        data["classroom_id"],
+        data["time_slot_id"]
     ])
 
     return {"status": "created"}
-
 @app.route("/api/create_instructor", methods=["POST"])
 def create_instructor():
     data = request.json
@@ -277,8 +280,8 @@ def update_classroom(id):
 
     call_proc("UpdateClassroom", [
         id,
+        data["room_number"],
         data["building"],
-        data["room_number"]
     ])
 
     return {"status": "updated"}
@@ -286,13 +289,32 @@ def update_classroom(id):
 @app.route("/api/update_student/<int:id>", methods=["PUT"])
 def update_student(id):
     data = request.json
+
     call_proc("UpdateStudent", [
         id,
-        data["name"],
-        data["major"]
+        data["first_name"],
+        data["last_name"],
+        data["department"],
+        data["advisor_id"]
+
     ])
+
     return {"status": "updated"}
 
+@app.route("/api/update_section/<int:id>", methods=["PUT"])
+def update_section(id):
+    data = request.json
+
+    call_proc("UpdateSection", [
+        id,
+        data["course_id"],
+        data["semester"],
+        data["year"],
+        data["classroom_id"],
+        data["time_slot_id"]
+    ])
+
+    return {"status": "updated"}
 
 @app.route("/api/update_instructor/<int:id>", methods=["PUT"])
 def update_instructor(id):
@@ -325,6 +347,11 @@ def update_department(id):
 @app.route("/api/delete_course/<int:id>", methods=["DELETE"])
 def delete_course(id):
     call_proc("DeleteCourse", [id])
+    return {"status": "deleted"}
+
+@app.route("/api/delete_section/<int:id>", methods=["DELETE"])
+def delete_section(id):
+    call_proc("DeleteSection", [id])
     return {"status": "deleted"}
 
 @app.route("/api/delete_timeslot/<int:id>", methods=["DELETE"])

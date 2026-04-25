@@ -127,7 +127,7 @@ const formSchemas = {
     instructors: [
         { key: "first_name", label: "First Name" },
         { key: "last_name", label: "Last Name" },
-        { key: "department_id", label: "Department Id" },
+        { key: "department_id", label: "Department", type: "select" },
         { key: "salary", label: "Salary" }
     ],
 
@@ -166,8 +166,16 @@ const formSchemas = {
 let cache = {};
 let departments = [];
 let activeTable = "";
+let buildings = [];
 
-loadDepartments();
+
+
+async function initData() {
+    await loadDepartments(); 
+    await loadBuildings();
+}
+
+initData();
 
 
 // LOAD DATA
@@ -179,6 +187,13 @@ async function loadTable(entity) {
     cache[entity] = data;
     return data;
 }
+
+async function loadBuildings() {
+    const res = await fetch("/api/building"); 
+    buildings = await res.json();
+}
+
+
 
 
 function renderActions(entity) {
@@ -291,7 +306,9 @@ if (entity === "students") {
             <input id="stu_first" placeholder="First Name"><br>
             <input id="stu_last" placeholder="Last Name"><br>
             <input id="stu_advisor" placeholder="Advisor ID"><br>
-            <input id="stu_dept" placeholder="Department ID"><br>
+            
+            <label>Department:</label><br>
+            <select id="stu_dept"></select><br>
 
             <button onclick="addStudent()">Submit</button>
         </div>
@@ -308,9 +325,8 @@ if (entity === "sections") {
             <h3>Add Section</h3>
 
             <input id="sec_course_id" placeholder="Course ID"><br>
-            <input id="sec_instructor_id" placeholder="Instructor ID"><br>
             <input id="sec_room_id" placeholder="Classroom ID"><br>
-            <input id="sec_timeslot_id" placeholder="Timeslot ID"><br>
+            <input id="sec_time_slot_id" placeholder="Timeslot ID"><br>
 
             <!-- NEW FIELDS -->
             <input id="sec_semester" placeholder="Semester (Fall/Spring)"><br>
@@ -330,22 +346,42 @@ function render(entity, data) {
     let html = `<h2>${entity.toUpperCase()}</h2>`;
     html += `<table><tr>`;
 
-    // headers
     Object.keys(data[0]).forEach(k => {
         html += `<th>${k}</th>`;
     });
-
     html += `<th>Actions</th></tr>`;
 
-    // rows
     data.forEach(row => {
         html += `<tr>`;
 
-        Object.values(row).forEach(v => {
-            html += `<td>${v}</td>`;
-        });
+        Object.entries(row).forEach(([key, v]) => {
+    let displayValue = v;
 
-        const id = row.department_id || row.course_id || row.student_id || row.instructor_id || row.classroom_id || row.time_slot_id
+    if ((key === "department_id" || key === "department") && entity !== "departments") {
+        const dept = departments.find(d => (d.id || d.department_id) == v);
+        if (dept) {
+            displayValue = dept.name || dept.dept_name;
+        }
+    }
+
+    if ((key === "building" || key === "building_id") && entity !== "buildings") {
+        const bld = buildings.find(b => (b.id || b.building_id) == v);
+        if (bld) {
+            displayValue = bld.name || bld.building_name;
+        }
+    }
+
+    html += `<td>${displayValue}</td>`;
+});
+
+        const id = row.department_id || 
+                   row.course_id || 
+                   row.student_id || 
+                   row.instructor_id || 
+                   row.classroom_id || 
+                   row.time_slot_id || 
+                   row.section_id || 
+                   row.id;
 
         html += `
             <td>
@@ -415,9 +451,8 @@ async function addTimeSlot() {
 async function addSection() {
     const data = {
         course_id: document.getElementById("sec_course_id").value,
-        instructor_id: document.getElementById("sec_instructor_id").value,
         classroom_id: document.getElementById("sec_room_id").value,
-        timeslot_id: document.getElementById("sec_timeslot_id").value,
+        time_slot_id: document.getElementById("sec_time_slot_id").value,
 
         // NEW
         semester: document.getElementById("sec_semester").value,
@@ -483,7 +518,7 @@ function openEditForm(entity, row) {
     `;
 
     schema.forEach(field => {
-        if (field.type === "select" && field.key === "department") {
+        if (field.type === "select" && field.key === "department" || field.key === "department_id") {
             html += `
                 <label>${field.label}</label><br>
                 <select id="edit_${field.key}"></select><br>
@@ -504,11 +539,17 @@ function openEditForm(entity, row) {
     `;
 
     document.getElementById("editFormContainer").innerHTML = html;
-
-    if (entity === "courses") {
+    
+    const dropdownEntities = ["courses", "students", "instructors"]
+if (dropdownEntities.includes(entity)) {
         setTimeout(() => {
-            const selectedId = row.department_id || row.department;
-            fillEditDepartmentDropdown(selectedId);
+            // Find which key in the schema is the department one
+            const deptField = schema.find(f => f.key === "department" || f.key === "department_id");
+            if (deptField) {
+                // Get the current value (handle both naming conventions)
+                const selectedId = row.department_id || row.department;
+                fillEditDepartmentDropdown(deptField.key, selectedId);
+            }
         }, 0);
     }
 }
@@ -525,16 +566,32 @@ function fillInstructorDeptDropdown() {
     });
 }
 
-function fillEditDepartmentDropdown(selectedId) {
-    const select = document.getElementById("edit_department");
+function fillStudentDeptDropdown() {
+    const select = document.getElementById("stu_dept");
+    select.innerHTML = "";
+
+    departments.forEach(d => {
+        const option = document.createElement("option");
+        // Using the same logic as your other dropdowns
+        option.value = d.id || d.department_id;
+        option.text = d.name || d.dept_name;
+        select.appendChild(option);
+    });
+}
+
+function fillEditDepartmentDropdown(fieldKey, selectedId) {
+    const select = document.getElementById(`edit_${fieldKey}`);
+    if (!select) return;
+    
     select.innerHTML = "";
 
     departments.forEach(d => {
         const option = document.createElement("option");
 
-        const deptId = d.id || d.department_id;
+        // Handle cases where API returns .id or .department_id
+        const deptId = d.department_id || d.id;
         option.value = deptId;
-        option.text = d.name || d.dept_name;
+        option.text = d.dept_name || d.name;
 
         if (deptId == selectedId) {
             option.selected = true;
@@ -656,11 +713,16 @@ function toggleForm(id) {
     el.style.display = show ? "block" : "none";
 
     if (id === "courseForm" && show) {
-        fillDepartmentDropdown();
+        fillDepartmentDropdown(); // This uses "course_dept"
     }
 
     if (id === "instructorForm" && show) {
-        fillInstructorDeptDropdown();
+        fillInstructorDeptDropdown(); // This uses "inst_dept"
+    }
+
+    // Add this block for students
+    if (id === "studentForm" && show) {
+        fillStudentDeptDropdown();
     }
 }
 
