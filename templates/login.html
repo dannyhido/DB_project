@@ -1,49 +1,199 @@
 <!doctype html>
 <html>
-<head>
-    <title>University Portal</title>
-    <style>
-        * { box-sizing: border-box; }
-        body {
-            background-color: #f0f2f5;
-            display: flex; justify-content: center; align-items: center;
-            height: 100vh; margin: 0;
-        }
-        .login-container {
-            background-color: #ffffff; padding: 2.5rem;
-            width: 100%; max-width: 400px; text-align: center;
-            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        h2 { color: #1c1e21; margin-bottom: 1.5rem; }
-        input[type="text"], input[type="password"] {
-            width: 100%; padding: 12px; margin-bottom: 1rem;
-            border: 1px solid #dddfe2; border-radius: 6px; font-size: 1rem;
-        }
-        input:focus { outline: none; border-color: #2c3e50; box-shadow: 0 0 0 2px #e7f3ff; }
-        button {
-            width: 100%; padding: 12px; background-color: #2c3e50;
-            border: none; border-radius: 6px; color: white;
-            font-size: 1.1rem; font-weight: bold; cursor: pointer;
-        }
-        button:hover { background-color: #1a252f; }
-        a { display: inline-block; margin-top: 1rem; color: #2c3e50; text-decoration: none; font-size: 0.9rem; }
-        a:hover { text-decoration: underline; }
-        .error { color: red; margin-bottom: 1rem; font-size: 0.9rem; }
-    </style>
-</head>
-<body>
-    <div class="login-container">
-        <h2>University Portal</h2>
-        {% if error %}
-        <div class="error">{{ error }}</div>
-        {% endif %}
-        <form action="/login" method="POST">
-            <input type="text" name="username" placeholder="Username" required />
-            <input type="password" name="password" placeholder="Password" required />
-            <button type="submit">Login</button>
-        </form>
-        <br />
-        <a href="/register">Don't have an account? Register here</a>
-    </div>
-</body>
+    <head>
+        <title>University Portal</title>
+        <script>
+            (function() {
+                var saved = localStorage.getItem('theme') || 'light';
+                document.documentElement.setAttribute('data-bs-theme', saved);
+            })();
+        </script>
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                background-color: #f0f2f5;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+            }
+
+            .login-container {
+                background-color: #ffffff;
+                padding: 2.5rem;
+                width: 100%;
+                max-width: 400px;
+                text-align: center;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+
+            h2 {
+                color: #1c1e21;
+                margin-bottom: 1.5rem;
+            }
+
+            input[type="text"],
+            input[type="password"] {
+                width: 100%;
+                padding: 12px;
+                margin-bottom: 1rem;
+                border: 1px solid #dddfe2;
+                border-radius: 6px;
+                font-size: 1rem;
+                background-color: white;
+            }
+
+            input:focus {
+                outline: none;
+                border-color: #2c3e50;
+                box-shadow: 0 0 0 2px #e7f3ff;
+            }
+
+            button {
+                width: 100%;
+                padding: 12px;
+                background-color: #2c3e50;
+                border: none;
+                border-radius: 6px;
+                color: white;
+                font-size: 1.1rem;
+                font-weight: bold;
+                cursor: pointer;
+                transition: background-color 0.2s;
+                margin-top: 0.5rem;
+            }
+
+            button:hover {
+                background-color: #1a252f;
+            }
+
+            a {
+                display: inline-block;
+                margin-top: 1rem;
+                color: #2c3e50;
+                text-decoration: none;
+                font-size: 0.9rem;
+            }
+
+            a:hover {
+                text-decoration: underline;
+            }
+
+            .error {
+                color: #b00020;
+                background-color: #fdecea;
+                border: 1px solid #f5c2c0;
+                border-radius: 6px;
+                padding: 0.6rem 0.75rem;
+                margin-bottom: 1rem;
+                font-size: 0.9rem;
+                text-align: left;
+            }
+
+            .theme-toggle {
+                position: fixed;
+                top: 1rem;
+                right: 1rem;
+                width: auto;
+                margin: 0;
+                background: transparent;
+                border: 1px solid #dddfe2;
+                border-radius: 6px;
+                padding: 6px 12px;
+                cursor: pointer;
+                font-size: 0.85rem;
+                font-weight: normal;
+                color: #1c1e21;
+            }
+            .theme-toggle:hover { background: rgba(0,0,0,0.04); }
+
+            /* Dark mode overrides */
+            [data-bs-theme="dark"] body { background-color: #1a1a1a; }
+            [data-bs-theme="dark"] .login-container {
+                background-color: #23272e;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            }
+            [data-bs-theme="dark"] h2 { color: #e4e6eb; }
+            [data-bs-theme="dark"] input[type="text"],
+            [data-bs-theme="dark"] input[type="password"] {
+                background-color: #1a1a1a;
+                border-color: #3a3f47;
+                color: #e4e6eb;
+            }
+            [data-bs-theme="dark"] input::placeholder { color: #8b8f97; }
+            [data-bs-theme="dark"] input:focus {
+                border-color: #6ea8fe;
+                box-shadow: 0 0 0 2px rgba(110, 168, 254, 0.25);
+            }
+            [data-bs-theme="dark"] button {
+                background-color: #3b5168;
+            }
+            [data-bs-theme="dark"] button:hover {
+                background-color: #4d6987;
+            }
+            [data-bs-theme="dark"] a { color: #6ea8fe; }
+            [data-bs-theme="dark"] .error {
+                color: #ff8a80;
+                background-color: #3a1a1a;
+                border-color: #5c2a2a;
+            }
+            [data-bs-theme="dark"] .theme-toggle {
+                color: #e4e6eb;
+                border-color: #3a3f47;
+                background: transparent;
+            }
+            [data-bs-theme="dark"] .theme-toggle:hover { background: rgba(255,255,255,0.06); }
+        </style>
+    </head>
+    <body>
+        <button type="button" class="theme-toggle" onclick="toggleTheme()" id="theme-toggle-btn">🌙 Dark</button>
+        <div class="login-container">
+            <h2>University Portal</h2>
+
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <form action="/login" method="POST">
+                <input
+                    type="text"
+                    name="username"
+                    placeholder="Username"
+                    required
+                />
+
+                <input
+                    type="password"
+                    name="password"
+                    placeholder="Password"
+                    required
+                />
+
+                <button type="submit">Login</button>
+            </form>
+
+            <a href="/register">Don't have an account? Register here</a>
+        </div>
+        <script>
+            function toggleTheme() {
+                var html = document.documentElement;
+                var next = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+                html.setAttribute('data-bs-theme', next);
+                localStorage.setItem('theme', next);
+                updateThemeButton();
+            }
+            function updateThemeButton() {
+                var btn = document.getElementById('theme-toggle-btn');
+                if (!btn) return;
+                var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+                btn.innerHTML = isDark ? '☀️ Light' : '🌙 Dark';
+            }
+            updateThemeButton();
+        </script>
+    </body>
 </html>

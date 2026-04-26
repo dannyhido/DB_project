@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Instructor Dashboard</title>
+    <script>
+        (function() {
+            var saved = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-bs-theme', saved);
+        })();
+    </script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
         body { display: flex; min-height: 100vh; background-color: #f8f9fa; }
@@ -13,12 +19,25 @@
         .sidebar .nav-link:hover, .sidebar .nav-link.active { background-color: #34495e; color: white; font-weight: bold; }
         .content { flex-grow: 1; padding: 40px; }
         .logout-btn { margin: 0 20px 20px 20px; }
+        .theme-toggle { margin: 0 20px 10px 20px; }
+
+        /* Dark mode overrides */
+        [data-bs-theme="dark"] body { background-color: #1a1a1a; color: #e4e6eb; }
+        [data-bs-theme="dark"] .sidebar { background-color: #14202b; border-right: 1px solid #2a2f36; }
+        [data-bs-theme="dark"] .sidebar .nav-link { border-bottom-color: rgba(255,255,255,0.05); }
+        [data-bs-theme="dark"] .sidebar .nav-link:hover,
+        [data-bs-theme="dark"] .sidebar .nav-link.active { background-color: #1f2d3a; }
+        [data-bs-theme="dark"] hr { border-color: #2a2f36; }
+        [data-bs-theme="dark"] #stats-results-area { background-color: #23272e !important; border-color: #2a2f36 !important; color: #e4e6eb; }
     </style>
 </head>
 <body>
 <div class="sidebar">
     <div class="logout-btn">
-        <a href="/logout" class="btn btn-sm btn-light w-100">Logout</a>
+        <a href="/logout" class="btn btn-sm btn-outline-light w-100">Logout</a>
+    </div>
+    <div class="theme-toggle">
+        <button type="button" class="btn btn-sm btn-outline-light w-100" onclick="toggleTheme()" id="theme-toggle-btn">🌙 Dark Mode</button>
     </div>
     <h2>Instructor</h2>
     <div class="nav flex-column">
@@ -52,6 +71,21 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    function toggleTheme() {
+        const html = document.documentElement;
+        const next = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-bs-theme', next);
+        localStorage.setItem('theme', next);
+        updateThemeButton();
+    }
+    function updateThemeButton() {
+        const btn = document.getElementById('theme-toggle-btn');
+        if (!btn) return;
+        const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        btn.innerHTML = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    }
+    updateThemeButton();
+
     const currentInstructorId = {{ instructor_id }};
     let gradeModal;
 
@@ -396,6 +430,63 @@
         });
         if (res.ok) alert("Profile updated!");
         else alert("Update failed.");
+    }
+
+    function renderStatsTable(rows, title) {
+        document.getElementById('stats-result-title').innerText = title;
+        const area = document.getElementById('stats-results-area');
+        if (!rows || !rows.length) {
+            area.innerHTML = '<p class="text-muted m-0">No results.</p>';
+            return;
+        }
+        const cols = Object.keys(rows[0]);
+        let html = '<table class="table table-sm mb-0"><thead><tr>';
+        cols.forEach(c => html += `<th>${c.replace(/_/g,' ').toUpperCase()}</th>`);
+        html += '</tr></thead><tbody>';
+        rows.forEach(r => {
+            html += '<tr>' + cols.map(c => `<td>${r[c] ?? ''}</td>`).join('') + '</tr>';
+        });
+        html += '</tbody></table>';
+        area.innerHTML = html;
+    }
+
+    async function queryDeptAvg() {
+        const res = await fetch('/api/avg_grade_by_department');
+        if (!res.ok) return alert('Request failed');
+        renderStatsTable(await res.json(), 'Average Grade by Department');
+    }
+
+    async function queryCourseTrend() {
+        const courseId = document.getElementById('stats-course-id').value;
+        const startYear = document.getElementById('stats-year-start').value;
+        const endYear = document.getElementById('stats-year-end').value;
+        if (!courseId || !startYear || !endYear) return alert('Fill all three fields');
+        const url = `/api/avg_grade_for_course?course_id=${encodeURIComponent(courseId)}` +
+                    `&start_year=${encodeURIComponent(startYear)}&end_year=${encodeURIComponent(endYear)}`;
+        const res = await fetch(url);
+        if (!res.ok) return alert('Request failed');
+        renderStatsTable(await res.json(), `Avg Grade for Course ${courseId} (${startYear}-${endYear})`);
+    }
+
+    async function queryRankedClasses() {
+        const sem = document.getElementById('rank-sem').value;
+        const yr = document.getElementById('rank-year').value;
+        if (!yr) return alert('Enter a year');
+        const res = await fetch(`/api/best_worst_classes?semester=${encodeURIComponent(sem)}&year=${encodeURIComponent(yr)}`);
+        if (!res.ok) return alert('Request failed');
+        renderStatsTable(await res.json(), `Best/Worst Classes (${sem} ${yr})`);
+    }
+
+    async function queryEnrollment(mode) {
+        const url = mode === 'current'
+            ? '/api/currently_enrolled_by_department'
+            : '/api/total_students_by_department';
+        const res = await fetch(url);
+        if (!res.ok) return alert('Request failed');
+        const title = mode === 'current'
+            ? 'Currently Enrolled Students by Department'
+            : 'Total Students by Department (All Time)';
+        renderStatsTable(await res.json(), title);
     }
 </script>
 </body>

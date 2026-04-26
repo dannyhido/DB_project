@@ -2,6 +2,12 @@
 <html>
     <head>
         <title>Register User</title>
+        <script>
+            (function() {
+                var saved = localStorage.getItem('theme') || 'light';
+                document.documentElement.setAttribute('data-bs-theme', saved);
+            })();
+        </script>
         <style>
             * {
                 box-sizing: border-box;
@@ -22,6 +28,8 @@
                 width: 100%;
                 max-width: 400px;
                 text-align: center;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             }
 
             h2 {
@@ -63,11 +71,69 @@
             }
 
             button:hover {
-                background-color: #2c3e50;
+                background-color: #1a252f;
             }
+
+            a {
+                display: inline-block;
+                margin-top: 1rem;
+                color: #2c3e50;
+                text-decoration: none;
+                font-size: 0.9rem;
+            }
+
+            a:hover {
+                text-decoration: underline;
+            }
+
+            .theme-toggle {
+                position: fixed;
+                top: 1rem;
+                right: 1rem;
+                background: transparent;
+                border: 1px solid #dddfe2;
+                border-radius: 6px;
+                padding: 6px 12px;
+                cursor: pointer;
+                font-size: 0.85rem;
+                color: #1c1e21;
+                width: auto;
+                margin: 0;
+            }
+
+            /* Dark mode overrides */
+            [data-bs-theme="dark"] body { background-color: #1a1a1a; }
+            [data-bs-theme="dark"] .register-container {
+                background-color: #23272e;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            }
+            [data-bs-theme="dark"] h2 { color: #e4e6eb; }
+            [data-bs-theme="dark"] input[type="text"],
+            [data-bs-theme="dark"] input[type="password"],
+            [data-bs-theme="dark"] select {
+                background-color: #1a1a1a;
+                border-color: #3a3f47;
+                color: #e4e6eb;
+            }
+            [data-bs-theme="dark"] input::placeholder { color: #8b8f97; }
+            [data-bs-theme="dark"] input:focus,
+            [data-bs-theme="dark"] select:focus {
+                border-color: #6ea8fe;
+                box-shadow: 0 0 0 2px rgba(110, 168, 254, 0.25);
+            }
+            [data-bs-theme="dark"] button { background-color: #3b5168; }
+            [data-bs-theme="dark"] button:hover { background-color: #4d6987; }
+            [data-bs-theme="dark"] a { color: #6ea8fe; }
+            [data-bs-theme="dark"] .theme-toggle {
+                color: #e4e6eb;
+                border-color: #3a3f47;
+                background: transparent;
+            }
+            [data-bs-theme="dark"] .theme-toggle:hover { background: transparent; }
         </style>
     </head>
     <body>
+        <button type="button" class="theme-toggle" onclick="toggleTheme()" id="theme-toggle-btn">🌙 Dark</button>
         <div class="register-container">
             <h2>Create User</h2>
 
@@ -95,5 +161,21 @@
                 <button type="submit">Create User</button>
             </form>
         </div>
+        <script>
+            function toggleTheme() {
+                var html = document.documentElement;
+                var next = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+                html.setAttribute('data-bs-theme', next);
+                localStorage.setItem('theme', next);
+                updateThemeButton();
+            }
+            function updateThemeButton() {
+                var btn = document.getElementById('theme-toggle-btn');
+                if (!btn) return;
+                var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+                btn.innerHTML = isDark ? '☀️ Light' : '🌙 Dark';
+            }
+            updateThemeButton();
+        </script>
     </body>
 </html>

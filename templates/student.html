@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard</title>
+    <script>
+        (function() {
+            var saved = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-bs-theme', saved);
+        })();
+    </script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
         body { display: flex; min-height: 100vh; background-color: #f8f9fa; }
@@ -13,14 +19,28 @@
         .sidebar .nav-link:hover, .sidebar .nav-link.active { background-color: #34495e; color: white; font-weight: bold; }
         .content { flex-grow: 1; padding: 40px; }
         .logout-btn { margin: 0 20px 20px 20px; }
+        .theme-toggle { margin: 0 20px 10px 20px; }
         .course-link { color: #0d6efd; cursor: pointer; font-weight: bold; }
         .course-link:hover { text-decoration: underline; }
+
+        /* Dark mode overrides */
+        [data-bs-theme="dark"] body { background-color: #1a1a1a; color: #e4e6eb; }
+        [data-bs-theme="dark"] .sidebar { background-color: #14202b; border-right: 1px solid #2a2f36; }
+        [data-bs-theme="dark"] .sidebar .nav-link { border-bottom-color: rgba(255,255,255,0.05); }
+        [data-bs-theme="dark"] .sidebar .nav-link:hover,
+        [data-bs-theme="dark"] .sidebar .nav-link.active { background-color: #1f2d3a; }
+        [data-bs-theme="dark"] .course-link { color: #6ea8fe; }
+        [data-bs-theme="dark"] .course-link:hover { color: #8bb9ff; }
+        [data-bs-theme="dark"] hr { border-color: #2a2f36; }
     </style>
 </head>
 <body>
 <div class="sidebar">
     <div class="logout-btn">
-        <a href="/logout" class="btn btn-sm btn-light w-100">Logout</a>
+        <a href="/logout" class="btn btn-sm btn-outline-light w-100">Logout</a>
+    </div>
+    <div class="theme-toggle">
+        <button type="button" class="btn btn-sm btn-outline-light w-100" onclick="toggleTheme()" id="theme-toggle-btn">🌙 Dark Mode</button>
     </div>
     <h2>Student</h2>
     <div class="nav flex-column">
@@ -53,6 +73,21 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    function toggleTheme() {
+        const html = document.documentElement;
+        const next = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-bs-theme', next);
+        localStorage.setItem('theme', next);
+        updateThemeButton();
+    }
+    function updateThemeButton() {
+        const btn = document.getElementById('theme-toggle-btn');
+        if (!btn) return;
+        const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        btn.innerHTML = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    }
+    updateThemeButton();
+
     const currentStudentId = {{ student_id }};
     let infoModal;
 
